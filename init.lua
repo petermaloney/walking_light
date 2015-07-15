@@ -6,6 +6,14 @@ function round(num)
 	return math.floor(num + 0.5) 
 end
 
+function remove_light(pos)
+    local is_light = minetest.env:get_node_or_nil(pos)
+    if is_light ~= nil and is_light.name == "walking_light:light" then
+        minetest.env:add_node(pos,{type="node",name="default:glass"})
+        minetest.env:add_node(pos,{type="node",name="air"})
+    end
+end
+
 minetest.register_on_joinplayer(function(player)
 	local player_name = player:get_player_name()
 	table.insert(players, player_name)
@@ -14,9 +22,7 @@ minetest.register_on_joinplayer(function(player)
 	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 	local wielded_item = player:get_wielded_item():get_name()
 	if wielded_item ~= "default:torch" and wielded_item ~= "walking_light:pick_mese" then
-		-- Neuberechnung des Lichts erzwingen
-		minetest.env:add_node(rounded_pos,{type="node",name="default:cobble"})
-		minetest.env:add_node(rounded_pos,{type="node",name="air"})
+		remove_light(rounded_pos)
 	end
 	player_positions[player_name] = {}
 	player_positions[player_name]["x"] = rounded_pos.x;
@@ -33,8 +39,7 @@ minetest.register_on_leaveplayer(function(player)
 			-- Neuberechnung des Lichts erzwingen
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-			minetest.env:add_node(rounded_pos,{type="node",name="default:cobble"})
-			minetest.env:add_node(rounded_pos,{type="node",name="air"})
+            remove_light(rounded_pos)
 			player_positions[player_name]["x"] = nil
 			player_positions[player_name]["y"] = nil
 			player_positions[player_name]["z"] = nil
@@ -63,11 +68,7 @@ minetest.register_globalstep(function(dtime)
 					-- wenn Position geänder, dann altes Licht löschen
 					local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
 					-- Neuberechnung des Lichts erzwingen
-					local is_light = minetest.env:get_node_or_nil(old_pos)
-					if is_light ~= nil and is_light.name == "walking_light:light" then
-						minetest.env:add_node(old_pos,{type="node",name="default:cobble"})
-						minetest.env:add_node(old_pos,{type="node",name="air"})
-					end
+                    remove_light(old_pos)
 				end
 				-- gemerkte Position ist nun die gerundete neue Position
 				player_positions[player_name]["x"] = rounded_pos.x
@@ -81,23 +82,11 @@ minetest.register_globalstep(function(dtime)
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 			repeat
-				local is_light  = minetest.env:get_node_or_nil(rounded_pos)
-				if is_light ~= nil and is_light.name == "walking_light:light" then
-					-- minetest.env:remove_node(rounded_pos)
-					-- Erzwinge Neuberechnung des Lichts
-					minetest.env:add_node(rounded_pos,{type="node",name="default:cobble"})
-					minetest.env:add_node(rounded_pos,{type="node",name="air"})
-				end
+                remove_light(rounded_pos)
 			until minetest.env:get_node_or_nil(rounded_pos) ~= "walking_light:light"
 			local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
 			repeat
-				is_light  = minetest.env:get_node_or_nil(old_pos)
-				if is_light ~= nil and is_light.name == "walking_light:light" then
-					-- minetest.env:remove_node(old_pos)
-					-- Erzwinge Neuberechnung des Lichts
-					minetest.env:add_node(old_pos,{type="node",name="default:cobble"})
-					minetest.env:add_node(old_pos,{type="node",name="air"})
-				end
+                remove_light(old_pos)
 			until minetest.env:get_node_or_nil(old_pos) ~= "walking_light:light"
 			last_wielded[player_name] = wielded_item
 		end
