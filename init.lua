@@ -24,22 +24,46 @@ end
 
 -- return true if item is a light item
 function is_light_item(item)
-	if item == "default:torch" or item == "walking_light:pick_mese" then
+	if item == "default:torch" or item == "walking_light:pick_mese" 
+            or item == "walking_light:helmet_diamond" then
         return true
     end
     return false
 end
 
+-- returns a string, the name of the item found that is a light item
+function get_wielded_light_item(player)
+    local wielded_item = player:get_wielded_item():get_name()
+    if is_light_item(wielded_item) then
+        return wielded_item
+    end
+
+    -- check equipped armor - requires unified_inventory maybe
+    local player_name = player:get_player_name()
+    if player_name then
+        local armor_inv = minetest.get_inventory({type="detached", name=player_name.."_armor"})
+        if armor_inv then
+--            print( dump(armor_inv:get_lists()) )
+            item_name = "walking_light:helmet_diamond"
+            local stack = ItemStack(item_name)
+            if armor_inv:contains_item("armor", stack) then
+                return item_name
+            end
+        end
+    end
+
+    return nil
+end
+
 -- return true if player is wielding a light item
 function wielded_light(player)
-    local wielded_item = player:get_wielded_item():get_name()
-    return is_light_item(wielded_item)
+    return get_wielded_light_item(player) ~= nil
 end
 
 minetest.register_on_joinplayer(function(player)
 	local player_name = player:get_player_name()
 	table.insert(players, player_name)
-	last_wielded[player_name] = player:get_wielded_item():get_name()
+	last_wielded[player_name] = get_wielded_light_item(player)
 	local pos = player:getpos()
 	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 	if not wielded_light(player) then
@@ -75,7 +99,7 @@ end)
 minetest.register_globalstep(function(dtime)
 	for i,player_name in ipairs(players) do
 		local player = minetest.env:get_player_by_name(player_name)
-		local wielded_item = player:get_wielded_item():get_name()
+		local wielded_item = get_wielded_light_item(player)
 		if is_light_item(wielded_item) then
 			-- Fackel ist in der Hand
 			local pos = player:getpos()
@@ -166,6 +190,14 @@ minetest.register_tool("walking_light:pick_mese", {
 	},
 })
 
+minetest.register_tool("walking_light:helmet_diamond", {
+    description = "Diamond Helmet with light",
+    inventory_image = "walking_light_inv_helmet_diamond.png",
+	wield_image = "3d_armor_inv_helmet_diamond.png",
+    groups = {armor_head=15, armor_heal=12, armor_use=100},
+    wear = 0,
+})
+
 minetest.register_craft({
 	output = 'walking_light:pick_mese',
 	recipe = {
@@ -173,3 +205,12 @@ minetest.register_craft({
 		{'default:pick_mese'},
 	}
 })
+
+minetest.register_craft({
+	output = 'walking_light:helmet_diamond',
+	recipe = {
+		{'default:torch'},
+		{'3d_armor:helmet_diamond'},
+	}
+})
+
