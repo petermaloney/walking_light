@@ -14,14 +14,27 @@ function remove_light(pos)
     end
 end
 
+-- return true if item is a light item
+function is_light_item(item)
+	if item == "default:torch" or item == "walking_light:pick_mese" then
+        return true
+    end
+    return false
+end
+
+-- return true if player is wielding a light item
+function wielded_light(player)
+    local wielded_item = player:get_wielded_item():get_name()
+    return is_light_item(wielded_item)
+end
+
 minetest.register_on_joinplayer(function(player)
 	local player_name = player:get_player_name()
 	table.insert(players, player_name)
 	last_wielded[player_name] = player:get_wielded_item():get_name()
 	local pos = player:getpos()
 	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-	local wielded_item = player:get_wielded_item():get_name()
-	if wielded_item ~= "default:torch" and wielded_item ~= "walking_light:pick_mese" then
+	if not wielded_light(player) then
 		remove_light(rounded_pos)
 	end
 	player_positions[player_name] = {}
@@ -53,11 +66,11 @@ minetest.register_globalstep(function(dtime)
 	for i,player_name in ipairs(players) do
 		local player = minetest.env:get_player_by_name(player_name)
 		local wielded_item = player:get_wielded_item():get_name()
-		if wielded_item == "default:torch" or wielded_item == "walking_light:pick_mese" then
+		if is_light_item(wielded_item) then
 			-- Fackel ist in der Hand
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-			if (last_wielded[player_name] ~= "default:torch" and last_wielded[player_name] ~= "walking_light:pick_mese") or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
+			if not is_light_item(last_wielded) or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
 				-- Fackel gerade in die Hand genommen oder zu neuem Node bewegt
 				local is_air  = minetest.env:get_node_or_nil(rounded_pos)
 				if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
@@ -77,7 +90,7 @@ minetest.register_globalstep(function(dtime)
 			end
 
 			last_wielded[player_name] = wielded_item;
-		elseif last_wielded[player_name] == "default:torch" or last_wielded[player_name] == "walking_light:pick_mese" then
+		elseif is_light_item(last_wielded) then
 			-- Fackel nicht in der Hand, aber beim letzten Durchgang war die Fackel noch in der Hand
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
