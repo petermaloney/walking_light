@@ -14,6 +14,14 @@ function remove_light(pos)
     end
 end
 
+function add_light(pos)
+    local is_air  = minetest.env:get_node_or_nil(pos)
+    if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
+        -- wenn an aktueller Position "air" ist, Fackellicht setzen
+        minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+    end
+end
+
 -- return true if item is a light item
 function is_light_item(item)
 	if item == "default:torch" or item == "walking_light:pick_mese" then
@@ -36,6 +44,8 @@ minetest.register_on_joinplayer(function(player)
 	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 	if not wielded_light(player) then
 		remove_light(rounded_pos)
+    else
+        add_light(rounded_pos)
 	end
 	player_positions[player_name] = {}
 	player_positions[player_name]["x"] = rounded_pos.x;
@@ -72,11 +82,7 @@ minetest.register_globalstep(function(dtime)
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 			if not is_light_item(last_wielded[player_name]) or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
 				-- Fackel gerade in die Hand genommen oder zu neuem Node bewegt
-				local is_air  = minetest.env:get_node_or_nil(rounded_pos)
-				if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
-					-- wenn an aktueller Position "air" ist, Fackellicht setzen
-					minetest.env:add_node(rounded_pos,{type="node",name="walking_light:light"})
-				end
+                add_light(rounded_pos)
 				if (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
 					-- wenn Position geänder, dann altes Licht löschen
 					local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
