@@ -9,7 +9,7 @@ end
 function remove_light(pos)
     local is_light = minetest.env:get_node_or_nil(pos)
     if is_light ~= nil and is_light.name == "walking_light:light" then
-        minetest.env:add_node(pos,{type="node",name="default:glass"})
+        minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
         minetest.env:add_node(pos,{type="node",name="air"})
     end
 end
@@ -92,6 +92,29 @@ minetest.register_globalstep(function(dtime)
 		end
 	end
 end)
+
+
+
+minetest.register_node("walking_light:clear", {
+
+	drawtype = "glasslike",
+	tile_images = {"walking_light.png"},
+	-- tile_images = {"walking_light_debug.png"},
+	--inventory_image = minetest.inventorycube("walking_light.png"),
+	--paramtype = "light",
+	walkable = false,
+	--is_ground_content = true,
+	light_propagates = true,
+	sunlight_propagates = true,
+	--light_source = 13,
+	selection_box = {
+        type = "fixed",
+        fixed = {0, 0, 0, 0, 0, 0},
+    },
+})
+
+
+
 
 minetest.register_node("walking_light:light", {
 	drawtype = "glasslike",
