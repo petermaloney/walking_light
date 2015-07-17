@@ -35,6 +35,12 @@ function round(num)
 end
 
 local function poseq(pos1, pos2)
+	if pos1 == nil and pos2 == nil then
+		return true
+	end
+	if pos1 == nil or pos2 == nil then
+		return false
+	end
 	return pos1.x == pos2.x and pos1.y == pos2.y and pos1.z == pos2.z
 end
 
@@ -378,23 +384,22 @@ minetest.register_chatcommand("mapclearlight", {
 	params = "<size>",
 	description = "Remove walking_light:light from the area",
 	func = function(name, param)
-		if minetest.check_player_privs(name, {server=true}) then
+		if not minetest.check_player_privs(name, {server=true}) then
 			return false, "You need the server privilege to use mapclearlight"
 		end
 
 		local pos = vector.round(minetest.get_player_by_name(name):getpos())
 		local size = tonumber(param) or 40
 
-		for x = pos.x - size, pos.x + size, 1 do
-			for y = pos.y - size, pos.y + size, 1 do
-				for z = pos.z - size, pos.z + size, 1 do
-					local point = vector.new(x, y, z)
---					print("DEBUG: walking_light.mapclearlight(), point = (" .. x .. "," .. y .. "," .. z .. ")" )
-					remove_light(nil, point)
-				end
+		point = minetest.find_node_near(pos, size/2, "walking_light:light")
+		while point do
+			remove_light(nil, point)
+			oldpoint = point
+			point = minetest.find_node_near(pos, size/2, "walking_light:light")
+			if poseq(oldpoint, point) then
+				return false, "Failed... infinite loop detected"
 			end
 		end
-
 		return true, "Done."
 	end,
 })
