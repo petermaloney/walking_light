@@ -1,5 +1,6 @@
 local players = {}
 local player_positions = {}
+local light_positions = {}
 local last_wielded = {}
 
 function round(num) 
@@ -7,19 +8,69 @@ function round(num)
 end
 
 function remove_light(pos)
-	local is_light = minetest.env:get_node_or_nil(pos)
-	if is_light ~= nil and is_light.name == "walking_light:light" then
+	local node = minetest.env:get_node_or_nil(pos)
+	if node ~= nil and node.name == "walking_light:light" then
 		minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
 		minetest.env:add_node(pos,{type="node",name="air"})
 	end
 end
 
-function add_light(pos)
-	local is_air  = minetest.env:get_node_or_nil(pos)
-	if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
+local function add_light(pos)
+	local node  = minetest.env:get_node_or_nil(pos)
+	if node == nil or node.name == "air" then
 		-- wenn an aktueller Position "air" ist, Fackellicht setzen
 		minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+--		if node then
+--			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dump(pos))
+--		else
+--			print("DEBUG: add_light(), node.name = nil, pos = " .. dump(pos))
+--		end
+		return true
+	elseif node.name == "walking_light:light" then
+--		print("DEBUG: add_light(), not adding; node.name = " .. node.name .. ", pos = " .. dump(pos))
+		return true
 	end
+--	print("DEBUG: add_light(), not adding; node.name = " .. node.name)
+	return false
+end
+
+local function add_light_near(pos)
+	local pos2 = pos
+	if add_light(pos) then
+		return pos
+	end
+
+	pos2 = vector.new(pos.x + 1, pos.y, pos.z)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x - 1, pos.y, pos.z)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y, pos.z + 1)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y, pos.z - 1)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y + 1, pos.z)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y - 1, pos.z)
+	if add_light( pos2 ) then
+		return pos2
+	end
+
+	return nil
 end
 
 -- return true if item is a light item
@@ -69,12 +120,13 @@ minetest.register_on_joinplayer(function(player)
 	if not wielded_light(player) then
 		remove_light(rounded_pos)
 	else
-		add_light(rounded_pos)
+		add_light_near(rounded_pos)
 	end
 	player_positions[player_name] = {}
 	player_positions[player_name]["x"] = rounded_pos.x;
 	player_positions[player_name]["y"] = rounded_pos.y;
 	player_positions[player_name]["z"] = rounded_pos.z;
+	light_positions[player_name] = {}
 end)
 
 minetest.register_on_leaveplayer(function(player)
@@ -96,27 +148,45 @@ minetest.register_on_leaveplayer(function(player)
 	end
 end)
 
+local function poseq(pos1, pos2)
+	return pos1.x == pos2.x and pos1.y == pos2.y and pos1.z == pos2.z
+end
+
 minetest.register_globalstep(function(dtime)
 	for i,player_name in ipairs(players) do
 		local player = minetest.env:get_player_by_name(player_name)
 		local wielded_item = get_wielded_light_item(player)
 		if is_light_item(wielded_item) then
-			-- Fackel ist in der Hand
+			-- wielding light
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 			if not is_light_item(last_wielded[player_name]) or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
-				-- Fackel gerade in die Hand genommen oder zu neuem Node bewegt
-				add_light(rounded_pos)
-				if (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
-					-- wenn Position geänder, dann altes Licht löschen
+				-- wielding light, or player moved
+				lightpos = add_light_near(rounded_pos)
+				if lightpos and (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
+					-- remove light in old player position
 					local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
-					-- Neuberechnung des Lichts erzwingen
-					remove_light(old_pos)
+					if not poseq(old_pos, lightpos) then
+						-- don't remove light that was just added
+--						print("DEBUG: walking_light globalstep, removing player light")
+						remove_light(old_pos)
+					end
+					local old_pos = {x=light_positions[player_name]["x"], y=light_positions[player_name]["y"], z=light_positions[player_name]["z"]}
+					if not poseq(old_pos, lightpos) then
+						-- don't remove light that was just added
+--						print("DEBUG: walking_light globalstep, removing old light")
+						remove_light(old_pos)
+					end
 				end
 				-- gemerkte Position ist nun die gerundete neue Position
 				player_positions[player_name]["x"] = rounded_pos.x
 				player_positions[player_name]["y"] = rounded_pos.y
 				player_positions[player_name]["z"] = rounded_pos.z
+				if lightpos then
+					light_positions[player_name]["x"] = lightpos.x
+					light_positions[player_name]["y"] = lightpos.y
+					light_positions[player_name]["z"] = lightpos.z
+				end
 			end
 
 			last_wielded[player_name] = wielded_item;
@@ -161,8 +231,8 @@ minetest.register_node("walking_light:clear", {
 
 minetest.register_node("walking_light:light", {
 	drawtype = "glasslike",
-	tile_images = {"walking_light.png"},
-	-- tile_images = {"walking_light_debug.png"},
+	-- tile_images = {"walking_light.png"},
+	tile_images = {"walking_light_debug.png"},
 	inventory_image = minetest.inventorycube("walking_light.png"),
 	paramtype = "light",
 	walkable = false,
