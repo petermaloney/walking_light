@@ -7,6 +7,29 @@ local light_positions = {}
 -- last item seen wielded by players
 local last_wielded = {}
 
+function mt_get_node_or_nil(pos)
+	if pos == nil then
+		print("ERROR: walking_light.mt_get_node_or_nil(), pos is nil")
+		print(debug.traceback("Current Callstack:\n"))
+		return nil
+	end
+	return minetest.env:get_node_or_nil(pos)
+end
+
+function mt_add_node(pos, sometable)
+	if pos == nil then
+		print("ERROR: walking_light.mt_add_node(), pos is nil")
+		print(debug.traceback("Current Callstack:\n"))
+		return nil
+	end
+	if sometable == nil then
+		print("ERROR: walking_light.mt_add_node(), sometable is nil")
+		print(debug.traceback("Current Callstack:\n"))
+		return nil
+	end
+	minetest.env:add_node(pos,sometable)
+end
+
 function round(num) 
 	return math.floor(num + 0.5) 
 end
@@ -37,10 +60,10 @@ local function remove_light(player, pos)
 	if player then
 		player_name = player:get_player_name()
 	end
-	local node = minetest.env:get_node_or_nil(pos)
+	local node = mt_get_node_or_nil(pos)
 	if node ~= nil and node.name == "walking_light:light" then
-		minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
-		minetest.env:add_node(pos,{type="node",name="air"})
+		mt_add_node(pos,{type="node",name="walking_light:clear"})
+		mt_add_node(pos,{type="node",name="air"})
 		if player_name then
 			light_positions[player_name] = nil
 		end
@@ -64,7 +87,7 @@ local function remove_light_player(player)
 end
 
 local function can_add_light(pos)
-	local node  = minetest.env:get_node_or_nil(pos)
+	local node  = mt_get_node_or_nil(pos)
 	if node == nil or node.name == "air" then
 --		print("walking_light can_add_light(), pos = " .. dump(pos) .. ", true")
 		return true
@@ -127,14 +150,14 @@ end
 -- adds light at the given position
 local function add_light(player, pos)
 	local player_name = player:get_player_name()
-	local node  = minetest.env:get_node_or_nil(pos)
+	local node  = mt_get_node_or_nil(pos)
 	if node == nil then
 		-- don't do anything for nil blocks... they are non-loaded blocks, so we don't want to overwrite anything there
 --		print("DEBUG: walking_light.add_light(), node is nil, pos = " .. dump(pos))
 		return false
 	elseif node.name == "air" then
 		-- wenn an aktueller Position "air" ist, Fackellicht setzen
-		minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+		mt_add_node(pos,{type="node",name="walking_light:light"})
 		light_positions[player_name] = pos
 --		if node then
 --			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dump(pos))
@@ -184,7 +207,7 @@ local function update_light_player(player)
 	if wielded_item then
 		-- check for a nil node; if it is nil, we assume the block is not loaded, so we return without updating player_positions
 		-- that way, it should add light next step
-		local node  = minetest.env:get_node_or_nil(pos)
+		local node  = mt_get_node_or_nil(pos)
 		if node == nil then
 			return
 		end
@@ -388,7 +411,7 @@ minetest.register_chatcommand("mapaddlight", {
 		pos = vector.new(pos.x, pos.y + 1, pos.z)
 
 		if pos then
-			minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+			mt_add_node(pos,{type="node",name="walking_light:light"})
 		end
 
 		return true, "Done."
