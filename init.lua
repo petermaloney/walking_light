@@ -7,57 +7,57 @@ function round(num)
 end
 
 function remove_light(pos)
-    local is_light = minetest.env:get_node_or_nil(pos)
-    if is_light ~= nil and is_light.name == "walking_light:light" then
-        minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
-        minetest.env:add_node(pos,{type="node",name="air"})
-    end
+	local is_light = minetest.env:get_node_or_nil(pos)
+	if is_light ~= nil and is_light.name == "walking_light:light" then
+		minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
+		minetest.env:add_node(pos,{type="node",name="air"})
+	end
 end
 
 function add_light(pos)
-    local is_air  = minetest.env:get_node_or_nil(pos)
-    if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
-        -- wenn an aktueller Position "air" ist, Fackellicht setzen
-        minetest.env:add_node(pos,{type="node",name="walking_light:light"})
-    end
+	local is_air  = minetest.env:get_node_or_nil(pos)
+	if is_air == nil or (is_air ~= nil and (is_air.name == "air" or is_air.name == "walking_light:light")) then
+		-- wenn an aktueller Position "air" ist, Fackellicht setzen
+		minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+	end
 end
 
 -- return true if item is a light item
 function is_light_item(item)
 	if item == "default:torch" or item == "walking_light:pick_mese" 
-            or item == "walking_light:helmet_diamond" then
-        return true
-    end
-    return false
+			or item == "walking_light:helmet_diamond" then
+		return true
+	end
+	return false
 end
 
 -- returns a string, the name of the item found that is a light item
 function get_wielded_light_item(player)
-    local wielded_item = player:get_wielded_item():get_name()
-    if is_light_item(wielded_item) then
-        return wielded_item
-    end
+	local wielded_item = player:get_wielded_item():get_name()
+	if is_light_item(wielded_item) then
+		return wielded_item
+	end
 
-    -- check equipped armor - requires unified_inventory maybe
-    local player_name = player:get_player_name()
-    if player_name then
-        local armor_inv = minetest.get_inventory({type="detached", name=player_name.."_armor"})
-        if armor_inv then
+	-- check equipped armor - requires unified_inventory maybe
+	local player_name = player:get_player_name()
+	if player_name then
+		local armor_inv = minetest.get_inventory({type="detached", name=player_name.."_armor"})
+		if armor_inv then
 --            print( dump(armor_inv:get_lists()) )
-            item_name = "walking_light:helmet_diamond"
-            local stack = ItemStack(item_name)
-            if armor_inv:contains_item("armor", stack) then
-                return item_name
-            end
-        end
-    end
+			item_name = "walking_light:helmet_diamond"
+			local stack = ItemStack(item_name)
+			if armor_inv:contains_item("armor", stack) then
+				return item_name
+			end
+		end
+	end
 
-    return nil
+	return nil
 end
 
 -- return true if player is wielding a light item
 function wielded_light(player)
-    return get_wielded_light_item(player) ~= nil
+	return get_wielded_light_item(player) ~= nil
 end
 
 minetest.register_on_joinplayer(function(player)
@@ -68,8 +68,8 @@ minetest.register_on_joinplayer(function(player)
 	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 	if not wielded_light(player) then
 		remove_light(rounded_pos)
-    else
-        add_light(rounded_pos)
+	else
+		add_light(rounded_pos)
 	end
 	player_positions[player_name] = {}
 	player_positions[player_name]["x"] = rounded_pos.x;
@@ -86,7 +86,7 @@ minetest.register_on_leaveplayer(function(player)
 			-- Neuberechnung des Lichts erzwingen
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-            remove_light(rounded_pos)
+			remove_light(rounded_pos)
 			player_positions[player_name]["x"] = nil
 			player_positions[player_name]["y"] = nil
 			player_positions[player_name]["z"] = nil
@@ -106,12 +106,12 @@ minetest.register_globalstep(function(dtime)
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 			if not is_light_item(last_wielded[player_name]) or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
 				-- Fackel gerade in die Hand genommen oder zu neuem Node bewegt
-                add_light(rounded_pos)
+				add_light(rounded_pos)
 				if (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
 					-- wenn Position geänder, dann altes Licht löschen
 					local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
 					-- Neuberechnung des Lichts erzwingen
-                    remove_light(old_pos)
+					remove_light(old_pos)
 				end
 				-- gemerkte Position ist nun die gerundete neue Position
 				player_positions[player_name]["x"] = rounded_pos.x
@@ -125,11 +125,11 @@ minetest.register_globalstep(function(dtime)
 			local pos = player:getpos()
 			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
 			repeat
-                remove_light(rounded_pos)
+				remove_light(rounded_pos)
 			until minetest.env:get_node_or_nil(rounded_pos) ~= "walking_light:light"
 			local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
 			repeat
-                remove_light(old_pos)
+				remove_light(old_pos)
 			until minetest.env:get_node_or_nil(old_pos) ~= "walking_light:light"
 			last_wielded[player_name] = wielded_item
 		end
@@ -151,9 +151,9 @@ minetest.register_node("walking_light:clear", {
 	sunlight_propagates = true,
 	--light_source = 13,
 	selection_box = {
-        type = "fixed",
-        fixed = {0, 0, 0, 0, 0, 0},
-    },
+		type = "fixed",
+		fixed = {0, 0, 0, 0, 0, 0},
+	},
 })
 
 
@@ -171,9 +171,9 @@ minetest.register_node("walking_light:light", {
 	sunlight_propagates = true,
 	light_source = 13,
 	selection_box = {
-        type = "fixed",
-        fixed = {0, 0, 0, 0, 0, 0},
-    },
+		type = "fixed",
+		fixed = {0, 0, 0, 0, 0, 0},
+	},
 })
 minetest.register_tool("walking_light:pick_mese", {
 	description = "Mese Pickaxe with light",
@@ -191,11 +191,11 @@ minetest.register_tool("walking_light:pick_mese", {
 })
 
 minetest.register_tool("walking_light:helmet_diamond", {
-    description = "Diamond Helmet with light",
-    inventory_image = "walking_light_inv_helmet_diamond.png",
+	description = "Diamond Helmet with light",
+	inventory_image = "walking_light_inv_helmet_diamond.png",
 	wield_image = "3d_armor_inv_helmet_diamond.png",
-    groups = {armor_head=15, armor_heal=12, armor_use=100},
-    wear = 0,
+	groups = {armor_head=15, armor_heal=12, armor_use=100},
+	wear = 0,
 })
 
 minetest.register_craft({
