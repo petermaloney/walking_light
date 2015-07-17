@@ -20,7 +20,7 @@ local function player_moved(player)
 	local player_name = player:get_player_name()
 	local pos = player:getpos()
 	local rounded_pos = vector.round(pos)
-    local oldpos = player_positions[player_name]
+	local oldpos = player_positions[player_name]
 	if not poseq(rounded_pos, oldpos) then
 		print("DEBUG: walking_light, player_moved(); moved = true; rounded_pos = " .. dump(rounded_pos) .. ", oldpos = " .. dump(oldpos))
 		return true
@@ -35,7 +35,7 @@ local function remove_light(player, pos)
 	local player_name
 	if player then
 		player_name = player:get_player_name()
-    end
+	end
 	local node = minetest.env:get_node_or_nil(pos)
 	if node ~= nil and node.name == "walking_light:light" then
 		minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
@@ -331,15 +331,15 @@ minetest.register_craft({
 })
 
 minetest.register_chatcommand("mapclearlight", {
-    params = "<size>",
-    description = "Remove walking_light:light from the area",
-    func = function(name, param)
-        if minetest.check_player_privs(name, {server=true}) then
-            return false, "You need the server privilege to use mapclearlight"
-        end
+	params = "<size>",
+	description = "Remove walking_light:light from the area",
+	func = function(name, param)
+		if minetest.check_player_privs(name, {server=true}) then
+			return false, "You need the server privilege to use mapclearlight"
+		end
 
-        local pos = vector.round(minetest.get_player_by_name(name):getpos())
-        local size = tonumber(param) or 40
+		local pos = vector.round(minetest.get_player_by_name(name):getpos())
+		local size = tonumber(param) or 40
 
 		for x = pos.x - size, pos.x + size, 1 do
 			for y = pos.y - size, pos.y + size, 1 do
@@ -351,26 +351,26 @@ minetest.register_chatcommand("mapclearlight", {
 			end
 		end
 
-        return true, "Done."
-    end,
+		return true, "Done."
+	end,
 })
 
 minetest.register_chatcommand("mapaddlight", {
-    params = "<size>",
-    description = "Add walking_light:light to a position, without a player owning it",
-    func = function(name, param)
-        if not minetest.check_player_privs(name, {server=true}) then
-            return false, "You need the server privilege to use mapaddlight"
-        end
+	params = "<size>",
+	description = "Add walking_light:light to a position, without a player owning it",
+	func = function(name, param)
+		if not minetest.check_player_privs(name, {server=true}) then
+			return false, "You need the server privilege to use mapaddlight"
+		end
 
-        local pos = vector.round(minetest.get_player_by_name(name):getpos())
+		local pos = vector.round(minetest.get_player_by_name(name):getpos())
 		pos = vector.new(pos.x, pos.y + 1, pos.z)
 
 		if pos then
 			minetest.env:add_node(pos,{type="node",name="walking_light:light"})
 		end
 
-        return true, "Done."
-    end,
+		return true, "Done."
+	end,
 })
 
