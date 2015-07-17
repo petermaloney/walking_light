@@ -1,25 +1,127 @@
+-- list of all players seen by minetest.register_on_joinplayer
 local players = {}
+-- all player positions last time light was updated: {name : {x, y, z}}
 local player_positions = {}
+-- all light positions of light that currently is created {name : {x, y, z}}
 local light_positions = {}
+-- last item seen wielded by players
 local last_wielded = {}
 
 function round(num) 
 	return math.floor(num + 0.5) 
 end
 
-function remove_light(pos)
+local function poseq(pos1, pos2)
+	return pos1.x == pos2.x and pos1.y == pos2.y and pos1.z == pos2.z
+end
+
+-- return true if the player moved since last player_positions update
+local function player_moved(player)
+	local player_name = player:get_player_name()
+	local pos = player:getpos()
+	local rounded_pos = vector.round(pos)
+    local oldpos = player_positions[player_name]
+	if not poseq(rounded_pos, oldpos) then
+		print("DEBUG: walking_light, player_moved(); moved = true; rounded_pos = " .. dump(rounded_pos) .. ", oldpos = " .. dump(oldpos))
+		return true
+	end
+--	print("DEBUG: walking_light, player_moved(); moved = false; rounded_pos = " .. dump(rounded_pos) .. ", oldpos = " .. dump(oldpos))
+	return false
+end
+
+-- removes light at the given position
+-- player is optional
+local function remove_light(player, pos)
+	local player_name
+	if player then
+		player_name = player:get_player_name()
+    end
 	local node = minetest.env:get_node_or_nil(pos)
 	if node ~= nil and node.name == "walking_light:light" then
 		minetest.env:add_node(pos,{type="node",name="walking_light:clear"})
 		minetest.env:add_node(pos,{type="node",name="air"})
+		if player_name then
+			light_positions[player_name] = nil
+		end
+	else
+		if node ~= nil then
+			print("WARNING: walking_light.remove_light(), pos = " .. dump(pos) .. ", tried to remove light but node was " .. node.name)
+		else
+			print("WARNING: walking_light.remove_light(), pos = " .. dump(pos) .. ", tried to remove light but node was nil")
+--			print("crash" .. nil)
+		end
 	end
 end
 
-local function add_light(pos)
+-- removes all light owned by a player
+local function remove_light_player(player)
+	local player_name = player:get_player_name()
+	-- currently one light... later may be many
+	local old_pos = light_positions[player_name]
+	print("DEBUG: walking_light globalstep, removing old light")
+	remove_light(player, old_pos)
+end
+
+local function can_add_light(pos)
 	local node  = minetest.env:get_node_or_nil(pos)
 	if node == nil or node.name == "air" then
+		return true
+	elseif node.name == "walking_light:light" then
+		return true
+	end
+	return false
+end
+
+local function pick_light_position(pos)
+	if can_add_light(pos) then
+		return pos
+	end
+
+	local pos2
+	pos2 = vector.new(pos.x + 1, pos.y, pos.z)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x - 1, pos.y, pos.z)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y, pos.z + 1)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y, pos.z - 1)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y + 1, pos.z)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	pos2 = vector.new(pos.x, pos.y - 1, pos.z)
+	if can_add_light( pos2 ) then
+		return pos2
+	end
+
+	return nil
+end
+
+-- adds light at the given position
+local function add_light(player, pos)
+	local player_name = player:get_player_name()
+	local node  = minetest.env:get_node_or_nil(pos)
+	if node == nil then
+		-- don't do anything for nil blocks... they are non-loaded blocks, so we don't want to overwrite anything there
+		return false
+	elseif node.name == "air" then
 		-- wenn an aktueller Position "air" ist, Fackellicht setzen
 		minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+		light_positions[player_name] = pos
 --		if node then
 --			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dump(pos))
 --		else
@@ -27,50 +129,58 @@ local function add_light(pos)
 --		end
 		return true
 	elseif node.name == "walking_light:light" then
+		-- no point in adding light where it is already, but we should assign it to the player so it gets removed (in case it has no player)
 --		print("DEBUG: add_light(), not adding; node.name = " .. node.name .. ", pos = " .. dump(pos))
+		light_positions[player_name] = pos
 		return true
 	end
 --	print("DEBUG: add_light(), not adding; node.name = " .. node.name)
 	return false
 end
 
-local function add_light_near(pos)
-	local pos2 = pos
-	if add_light(pos) then
-		return pos
+-- updates all the light around the player, depending on what they are wielding
+local function update_light_player(player)
+	-- figure out if they wield light; this will be nil if not
+	local wielded_item = get_wielded_light_item(player)
+
+	local player_name = player:get_player_name()
+	local pos = player:getpos()
+	local rounded_pos = vector.round(pos)
+
+--	if not player_moved(player) and wielded_item == last_wielded[player_name] then
+--		-- no update needed if the wiedled light item is the same as before (including nil), and the player didn't move
+--		return
+--	end
+	last_wielded[player_name] = wielded_item;
+
+	local lightpos
+	local wantpos = vector.new(rounded_pos.x, rounded_pos.y + 1, rounded_pos.z)
+	if wielded_item then
+		-- decide where light should be
+		lightpos = pick_light_position(wantpos)
+		print("DEBUG: walking_light update_light_player(); wantpos = " .. dump(wantpos) .. ", lightpos = " .. dump(lightpos))
 	end
 
-	pos2 = vector.new(pos.x + 1, pos.y, pos.z)
-	if add_light( pos2 ) then
-		return pos2
+	-- go through all light owned by the player (currently only zero or one nodes) to remove all but what should be kept
+	local oldlightpos = light_positions[player_name]
+	if oldlightpos and oldlightpos.x and ( not lightpos or not poseq(lightpos, oldlightpos) ) then -- later this will be more like:  if not lightpos.contains(oldlightpos)
+		remove_light(player, oldlightpos)
 	end
 
-	pos2 = vector.new(pos.x - 1, pos.y, pos.z)
-	if add_light( pos2 ) then
-		return pos2
+	if wielded_item then
+		-- add light that isn't already there
+		add_light(player, lightpos)
 	end
 
-	pos2 = vector.new(pos.x, pos.y, pos.z + 1)
-	if add_light( pos2 ) then
-		return pos2
-	end
+	player_positions[player_name] = vector.round(pos)
+end
 
-	pos2 = vector.new(pos.x, pos.y, pos.z - 1)
-	if add_light( pos2 ) then
-		return pos2
+local function update_light_all()
+	-- go through all players to check
+	for i,player_name in ipairs(players) do
+		local player = minetest.env:get_player_by_name(player_name)
+		update_light_player(player)
 	end
-
-	pos2 = vector.new(pos.x, pos.y + 1, pos.z)
-	if add_light( pos2 ) then
-		return pos2
-	end
-
-	pos2 = vector.new(pos.x, pos.y - 1, pos.z)
-	if add_light( pos2 ) then
-		return pos2
-	end
-
-	return nil
 end
 
 -- return true if item is a light item
@@ -95,7 +205,7 @@ function get_wielded_light_item(player)
 		local armor_inv = minetest.get_inventory({type="detached", name=player_name.."_armor"})
 		if armor_inv then
 --            print( dump(armor_inv:get_lists()) )
-			item_name = "walking_light:helmet_diamond"
+			local item_name = "walking_light:helmet_diamond"
 			local stack = ItemStack(item_name)
 			if armor_inv:contains_item("armor", stack) then
 				return item_name
@@ -116,17 +226,9 @@ minetest.register_on_joinplayer(function(player)
 	table.insert(players, player_name)
 	last_wielded[player_name] = get_wielded_light_item(player)
 	local pos = player:getpos()
-	local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-	if not wielded_light(player) then
-		remove_light(rounded_pos)
-	else
-		add_light_near(rounded_pos)
-	end
-	player_positions[player_name] = {}
-	player_positions[player_name]["x"] = rounded_pos.x;
-	player_positions[player_name]["y"] = rounded_pos.y;
-	player_positions[player_name]["z"] = rounded_pos.z;
+	player_positions[player_name] = vector.round(pos)
 	light_positions[player_name] = {}
+	update_light_player(player)
 end)
 
 minetest.register_on_leaveplayer(function(player)
@@ -137,8 +239,8 @@ minetest.register_on_leaveplayer(function(player)
 			last_wielded[player_name] = nil
 			-- Neuberechnung des Lichts erzwingen
 			local pos = player:getpos()
-			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-			remove_light(rounded_pos)
+			local rounded_pos = vector.round(pos)
+			remove_light_player(player)
 			player_positions[player_name]["x"] = nil
 			player_positions[player_name]["y"] = nil
 			player_positions[player_name]["z"] = nil
@@ -148,68 +250,14 @@ minetest.register_on_leaveplayer(function(player)
 	end
 end)
 
-local function poseq(pos1, pos2)
-	return pos1.x == pos2.x and pos1.y == pos2.y and pos1.z == pos2.z
-end
-
 minetest.register_globalstep(function(dtime)
 	for i,player_name in ipairs(players) do
 		local player = minetest.env:get_player_by_name(player_name)
-		local wielded_item = get_wielded_light_item(player)
-		if is_light_item(wielded_item) then
-			-- wielding light
-			local pos = player:getpos()
-			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-			if not is_light_item(last_wielded[player_name]) or (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
-				-- wielding light, or player moved
-				lightpos = add_light_near(rounded_pos)
-				if lightpos and (player_positions[player_name]["x"] ~= rounded_pos.x or player_positions[player_name]["y"] ~= rounded_pos.y or player_positions[player_name]["z"] ~= rounded_pos.z) then
-					-- remove light in old player position
-					local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
-					if not poseq(old_pos, lightpos) then
-						-- don't remove light that was just added
---						print("DEBUG: walking_light globalstep, removing player light")
-						remove_light(old_pos)
-					end
-					local old_pos = {x=light_positions[player_name]["x"], y=light_positions[player_name]["y"], z=light_positions[player_name]["z"]}
-					if not poseq(old_pos, lightpos) then
-						-- don't remove light that was just added
---						print("DEBUG: walking_light globalstep, removing old light")
-						remove_light(old_pos)
-					end
-				end
-				-- gemerkte Position ist nun die gerundete neue Position
-				player_positions[player_name]["x"] = rounded_pos.x
-				player_positions[player_name]["y"] = rounded_pos.y
-				player_positions[player_name]["z"] = rounded_pos.z
-				if lightpos then
-					light_positions[player_name]["x"] = lightpos.x
-					light_positions[player_name]["y"] = lightpos.y
-					light_positions[player_name]["z"] = lightpos.z
-				end
-			end
-
-			last_wielded[player_name] = wielded_item;
-		elseif is_light_item(last_wielded[player_name]) then
-			-- Fackel nicht in der Hand, aber beim letzten Durchgang war die Fackel noch in der Hand
-			local pos = player:getpos()
-			local rounded_pos = {x=round(pos.x),y=round(pos.y)+1,z=round(pos.z)}
-			repeat
-				remove_light(rounded_pos)
-			until minetest.env:get_node_or_nil(rounded_pos) ~= "walking_light:light"
-			local old_pos = {x=player_positions[player_name]["x"], y=player_positions[player_name]["y"], z=player_positions[player_name]["z"]}
-			repeat
-				remove_light(old_pos)
-			until minetest.env:get_node_or_nil(old_pos) ~= "walking_light:light"
-			last_wielded[player_name] = wielded_item
-		end
+		update_light_player(player)
 	end
 end)
 
-
-
 minetest.register_node("walking_light:clear", {
-
 	drawtype = "glasslike",
 	tile_images = {"walking_light.png"},
 	-- tile_images = {"walking_light_debug.png"},
@@ -225,9 +273,6 @@ minetest.register_node("walking_light:clear", {
 		fixed = {0, 0, 0, 0, 0, 0},
 	},
 })
-
-
-
 
 minetest.register_node("walking_light:light", {
 	drawtype = "glasslike",
@@ -245,6 +290,7 @@ minetest.register_node("walking_light:light", {
 		fixed = {0, 0, 0, 0, 0, 0},
 	},
 })
+
 minetest.register_tool("walking_light:pick_mese", {
 	description = "Mese Pickaxe with light",
 	inventory_image = "walking_light_mesepick.png",
@@ -282,5 +328,49 @@ minetest.register_craft({
 		{'default:torch'},
 		{'3d_armor:helmet_diamond'},
 	}
+})
+
+minetest.register_chatcommand("mapclearlight", {
+    params = "<size>",
+    description = "Remove walking_light:light from the area",
+    func = function(name, param)
+        if minetest.check_player_privs(name, {server=true}) then
+            return false, "You need the server privilege to use mapclearlight"
+        end
+
+        local pos = vector.round(minetest.get_player_by_name(name):getpos())
+        local size = tonumber(param) or 40
+
+		for x = pos.x - size, pos.x + size, 1 do
+			for y = pos.y - size, pos.y + size, 1 do
+				for z = pos.z - size, pos.z + size, 1 do
+					local point = vector.new(x, y, z)
+					print("walking_light.mapclearlight(), point = (" .. x .. "," .. y .. "," .. z .. ")" )
+					remove_light(nil, point)
+				end
+			end
+		end
+
+        return true, "Done."
+    end,
+})
+
+minetest.register_chatcommand("mapaddlight", {
+    params = "<size>",
+    description = "Add walking_light:light to a position, without a player owning it",
+    func = function(name, param)
+        if not minetest.check_player_privs(name, {server=true}) then
+            return false, "You need the server privilege to use mapaddlight"
+        end
+
+        local pos = vector.round(minetest.get_player_by_name(name):getpos())
+		pos = vector.new(pos.x, pos.y + 1, pos.z)
+
+		if pos then
+			minetest.env:add_node(pos,{type="node",name="walking_light:light"})
+		end
+
+        return true, "Done."
+    end,
 })
 
