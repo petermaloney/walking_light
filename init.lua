@@ -360,7 +360,7 @@ local function update_light_player(player)
 
 	player_positions[player_name] = vector.round(pos)
 
-	print("DEBUG: walking_light.update_light_player(): wantlightpos = " .. dumppostable(wantlightpos) .. ", light_positions = " .. dumppostable(light_positions[player_name]))
+--	print("DEBUG: walking_light.update_light_player(): wantlightpos = " .. dumppostable(wantlightpos) .. ", light_positions = " .. dumppostable(light_positions[player_name]))
 end
 
 local function update_light_all()
