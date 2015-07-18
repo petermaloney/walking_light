@@ -1,11 +1,58 @@
 -- list of all players seen by minetest.register_on_joinplayer
 local players = {}
--- all player positions last time light was updated: {name : {x, y, z}}
+-- all player positions last time light was updated: {player_name : {x, y, z}}
 local player_positions = {}
--- all light positions of light that currently is created {name : {x, y, z}}
+-- all light positions of light that currently is created {player_name : {i: {x, y, z}}
 local light_positions = {}
 -- last item seen wielded by players
 local last_wielded = {}
+
+-- from http://lua-users.org/wiki/IteratorsTutorial
+-- useful for removing things from a table because removing from the middle makes it skip elements otherwise
+function ripairs(t)
+  local function ripairs_it(t,i)
+    i=i-1
+    local v=t[i]
+    if v==nil then return v end
+    return i,v
+  end
+  return ripairs_it, t, #t+1
+end
+
+-- formats a vector with shorter output than dump
+local function dumppos(pos)
+	if pos == nil then
+		return "nil"
+	end
+	local x = "nil"
+	if pos.x then
+		x = pos.x
+	end
+	local y = "nil"
+	if pos.y then
+		y = pos.y
+	end
+	local z = "nil"
+	if pos.z then
+		z = pos.z
+	end
+
+	return "(" .. x .. "," .. y .. "," .. z .. ")"
+end
+
+-- formats a table containing vectors with shorter output than dump
+local function dumppostable(t)
+	if t == nil then
+		return "nil"
+	end
+	ret = "" .. #t
+	ret = ret .. "{\n"
+	for i,pos in ipairs(t) do
+		ret = ret .. "    " .. dumppos(pos) .. "\n"
+	end
+	ret = ret .. "}"
+	return ret
+end
 
 function mt_get_node_or_nil(pos)
 	if pos == nil then
@@ -52,11 +99,43 @@ local function player_moved(player)
 	local oldpos = player_positions[player_name]
 	if oldpos == nil or not poseq(rounded_pos, oldpos) then
 		-- if oldpos is nil, we assume they just logged in, so consider them moved
---		print("DEBUG: walking_light, player_moved(); moved = true; rounded_pos = " .. dump(rounded_pos) .. ", oldpos = " .. dump(oldpos))
+--		print("DEBUG: walking_light, player_moved(); moved = true; rounded_pos = " .. dumppos(rounded_pos) .. ", oldpos = " .. dumppos(oldpos))
 		return true
 	end
---	print("DEBUG: walking_light, player_moved(); moved = false; rounded_pos = " .. dump(rounded_pos) .. ", oldpos = " .. dump(oldpos))
+--	print("DEBUG: walking_light, player_moved(); moved = false; rounded_pos = " .. dumppos(rounded_pos) .. ", oldpos = " .. dumppos(oldpos))
 	return false
+end
+
+-- same as table.remove(t,remove_pos), but uses poseq instead of comparing references (does lua have comparator support, so this isn't needed?)
+local function table_remove_pos(t, remove_pos)
+--	local DEBUG_oldsize = #t
+
+	for i,pos in ipairs(t) do
+		if poseq(pos, remove_pos) then
+			table.remove(t, i)
+			break
+		end
+	end
+
+--	local DEBUG_newsize = #t
+--	print("DEBUG: walking_light.table_remove_pos(), oldsize = " .. DEBUG_oldsize .. ", newsize = " .. DEBUG_newsize)
+end
+
+-- same as t[remove_pos], but uses poseq instead of comparing references (does lua have comparator support, so this isn't needed?)
+local function table_contains_pos(t, remove_pos)
+	for i,pos in ipairs(t) do
+		if poseq(pos, remove_pos) then
+			return true
+		end
+	end
+	return false
+end
+
+-- same as table.insert(t,pos) but makes sure it is not duplicated
+local function table_insert_pos(t, pos)
+	if not table_contains_pos( pos ) then
+		table.insert(t, pos)
+	end
 end
 
 -- removes light at the given position
@@ -71,14 +150,14 @@ local function remove_light(player, pos)
 		mt_add_node(pos,{type="node",name="walking_light:clear"})
 		mt_add_node(pos,{type="node",name="air"})
 		if player_name then
-			light_positions[player_name] = nil
+			table_remove_pos(light_positions[player_name], pos)
 		end
 	else
 		if node ~= nil then
-			print("WARNING: walking_light.remove_light(), pos = " .. dump(pos) .. ", tried to remove light but node was " .. node.name)
+			print("WARNING: walking_light.remove_light(), pos = " .. dumppos(pos) .. ", tried to remove light but node was " .. node.name)
+			table_remove_pos(light_positions[player_name], pos)
 		else
-			print("WARNING: walking_light.remove_light(), pos = " .. dump(pos) .. ", tried to remove light but node was nil")
---			print("crash" .. nil)
+			print("WARNING: walking_light.remove_light(), pos = " .. dumppos(pos) .. ", tried to remove light but node was nil")
 		end
 	end
 end
@@ -86,28 +165,32 @@ end
 -- removes all light owned by a player
 local function remove_light_player(player)
 	local player_name = player:get_player_name()
-	-- currently one light... later may be many
-	local old_pos = light_positions[player_name]
---	print("DEBUG: walking_light globalstep, removing old light")
-	remove_light(player, old_pos)
+
+    for i,old_pos in ripairs(light_positions[player_name]) do
+		if old_pos then
+--			print("DEBUG: walking_light globalstep, removing old light")
+			remove_light(player, old_pos)
+		end
+	end
 end
 
 local function can_add_light(pos)
 	local node  = mt_get_node_or_nil(pos)
 	if node == nil or node.name == "air" then
---		print("walking_light can_add_light(), pos = " .. dump(pos) .. ", true")
+--		print("walking_light can_add_light(), pos = " .. dumppos(pos) .. ", true")
 		return true
 	elseif node.name == "walking_light:light" then
---		print("walking_light can_add_light(), pos = " .. dump(pos) .. ", true")
+--		print("walking_light can_add_light(), pos = " .. dumppos(pos) .. ", true")
 		return true
 	end
---	print("walking_light can_add_light(), pos = " .. dump(pos) .. ", false")
+--	print("walking_light can_add_light(), pos = " .. dumppos(pos) .. ", false")
 	return false
 end
 
-local function pick_light_position(player, pos)
+-- old function returns pos instead of table, for only one position
+local function pick_light_position_regular(player, pos)
 	if can_add_light(pos) then
-		return pos
+		return {pos}
 	end
 
 	local pos2
@@ -122,35 +205,72 @@ local function pick_light_position(player, pos)
 	-- if not, try all positions around the pos
 	pos2 = vector.new(pos.x + 1, pos.y, pos.z)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	pos2 = vector.new(pos.x - 1, pos.y, pos.z)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	pos2 = vector.new(pos.x, pos.y, pos.z + 1)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	pos2 = vector.new(pos.x, pos.y, pos.z - 1)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	pos2 = vector.new(pos.x, pos.y + 1, pos.z)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	pos2 = vector.new(pos.x, pos.y - 1, pos.z)
 	if can_add_light( pos2 ) then
-		return pos2
+		return {pos2}
 	end
 
 	return nil
+end
+
+-- new function, returns table
+local function pick_light_position_radius(player, pos, ret, radius)
+	local pos2
+	local step = 1
+
+	for x = pos.x - radius, pos.x + radius, step do
+		for y = pos.y - radius, pos.y + radius, step do
+			for z = pos.z - radius, pos.z + radius, step do
+				pos2 = vector.new(x, y, z)
+				if can_add_light( pos2 ) then
+					table.insert(ret, pos2)
+				end
+			end
+		end
+	end
+
+	return ret
+end
+
+local function pick_light_position_mega(player, pos)
+	local ret = {}
+
+	if can_add_light(pos) then
+		table.insert(ret, pos)
+	end
+	pick_light_position_radius(player, pos, ret, 10)
+
+	return ret
+end
+
+local function pick_light_position(player, pos, light_item)
+	if light_item == "walking_light:megatorch" then
+		return pick_light_position_mega(player, pos)
+	end
+	return pick_light_position_regular(player, pos)
 end
 
 -- adds light at the given position
@@ -159,22 +279,28 @@ local function add_light(player, pos)
 	local node  = mt_get_node_or_nil(pos)
 	if node == nil then
 		-- don't do anything for nil blocks... they are non-loaded blocks, so we don't want to overwrite anything there
---		print("DEBUG: walking_light.add_light(), node is nil, pos = " .. dump(pos))
+--		print("DEBUG: walking_light.add_light(), node is nil, pos = " .. dumppos(pos))
 		return false
 	elseif node.name == "air" then
-		-- wenn an aktueller Position "air" ist, Fackellicht setzen
+		-- when the node that is already there is air, add light
 		mt_add_node(pos,{type="node",name="walking_light:light"})
-		light_positions[player_name] = pos
+		table_insert_pos(light_positions[player_name], pos)
+
 --		if node then
---			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dump(pos))
+--			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dumppos(pos))
 --		else
---			print("DEBUG: add_light(), node.name = nil, pos = " .. dump(pos))
+--			print("DEBUG: add_light(), node.name = nil, pos = " .. dumppos(pos))
 --		end
 		return true
 	elseif node.name == "walking_light:light" then
 		-- no point in adding light where it is already, but we should assign it to the player so it gets removed (in case it has no player)
---		print("DEBUG: add_light(), not adding; node.name = " .. node.name .. ", pos = " .. dump(pos))
-		light_positions[player_name] = pos
+--		print("DEBUG: add_light(), not adding; node.name = " .. node.name .. ", pos = " .. dumppos(pos))
+
+		-- old single position
+--		light_positions[player_name] = pos
+		-- new table of positions
+		table_insert_pos(light_positions[player_name], pos)
+
 		return true
 	end
 --	print("DEBUG: add_light(), not adding; node.name = " .. node.name)
@@ -190,39 +316,45 @@ local function update_light_player(player)
 	local pos = player:getpos()
 	local rounded_pos = vector.round(pos)
 
+	-- check for a nil node where the player is; if it is nil, we assume the block is not loaded, so we return without updating player_positions
+	-- that way, it should add light next step
+	local node  = mt_get_node_or_nil(rounded_pos)
+	if node == nil then
+		return
+	end
+
 	if not player_moved(player) and wielded_item == last_wielded[player_name] then
 		-- no update needed if the wiedled light item is the same as before (including nil), and the player didn't move
 		return
 	end
 	last_wielded[player_name] = wielded_item;
 
-	local lightpos
+	local wantlightpos = nil
 	local wantpos = vector.new(rounded_pos.x, rounded_pos.y + 1, rounded_pos.z)
 	if wielded_item then
 		-- decide where light should be
-		lightpos = pick_light_position(player, wantpos)
---		print("DEBUG: walking_light update_light_player(); wantpos = " .. dump(wantpos) .. ", lightpos = " .. dump(lightpos))
+		wantlightpos = pick_light_position(player, wantpos, wielded_item)
+--		print("DEBUG: walking_light update_light_player(); wantpos = " .. dumppos(wantpos) .. ", wantlightpos = " .. dumppos(wantlightpos))
 	end
 
-	-- go through all light owned by the player (currently only zero or one nodes) to remove all but what should be kept
-	local oldlightpos = light_positions[player_name]
-	if oldlightpos and oldlightpos.x and ( not lightpos or not poseq(lightpos, oldlightpos) ) then -- later this will be more like:  if not lightpos.contains(oldlightpos)
-		remove_light(player, oldlightpos)
-	end
+	-- go through all light owned by the player to remove all but what should be kept
+    for i,oldlightpos in ripairs(light_positions[player_name]) do
+        if not wantlightpos or oldlightpos and oldlightpos.x and not table_contains_pos(wantlightpos, oldlightpos) then
+			remove_light(player, oldlightpos)
+        end
+    end
 
 	if wielded_item then
-		-- check for a nil node; if it is nil, we assume the block is not loaded, so we return without updating player_positions
-		-- that way, it should add light next step
-		local node  = mt_get_node_or_nil(pos)
-		if node == nil then
-			return
-		end
-
 		-- add light that isn't already there
-		add_light(player, lightpos)
+		print("DEBUG: walking_light.update_light_player(): adding light table")
+		for i,newpos in ipairs(wantlightpos) do
+			add_light(player, newpos)
+		end
 	end
 
 	player_positions[player_name] = vector.round(pos)
+
+--	print("DEBUG: walking_light.update_light_player(): wantlightpos = " .. dumppostable(wantlightpos) .. ", light_positions = " .. dumppostable(light_positions[player_name]))
 end
 
 local function update_light_all()
@@ -236,7 +368,8 @@ end
 -- return true if item is a light item
 function is_light_item(item)
 	if item == "default:torch" or item == "walking_light:pick_mese" 
-			or item == "walking_light:helmet_diamond" then
+			or item == "walking_light:helmet_diamond"
+			or item == "walking_light:megatorch" then
 		return true
 	end
 	return false
@@ -277,7 +410,7 @@ minetest.register_on_joinplayer(function(player)
 	last_wielded[player_name] = get_wielded_light_item(player)
 	local pos = player:getpos()
 	player_positions[player_name] = nil
-	light_positions[player_name] = nil
+	light_positions[player_name] = {}
 	update_light_player(player)
 end)
 
@@ -364,6 +497,57 @@ minetest.register_tool("walking_light:helmet_diamond", {
 	wear = 0,
 })
 
+minetest.register_node("walking_light:megatorch", {
+    description = "Megatorch",
+    drawtype = "torchlike",
+    tiles = {
+        {
+            name = "default_torch_on_floor_animated.png",
+            animation = {
+                type = "vertical_frames",
+                aspect_w = 16,
+                aspect_h = 16,
+                length = 3.0
+            },
+        },
+        {
+            name="default_torch_on_ceiling_animated.png",
+            animation = {
+                type = "vertical_frames",
+                aspect_w = 16,
+                aspect_h = 16,
+                length = 3.0
+            },
+        },
+        {
+            name="default_torch_animated.png",
+            animation = {
+                type = "vertical_frames",
+                aspect_w = 16,
+                aspect_h = 16,
+                length = 3.0
+            },
+        },
+    },
+    inventory_image = "default_torch_on_floor.png",
+    wield_image = "default_torch_on_floor.png",
+    paramtype = "light",
+    paramtype2 = "wallmounted",
+    sunlight_propagates = true,
+    is_ground_content = false,
+    walkable = false,
+    light_source = 13,
+    selection_box = {
+        type = "wallmounted",
+        wall_top = {-0.1, 0.5-0.6, -0.1, 0.1, 0.5, 0.1},
+        wall_bottom = {-0.1, -0.5, -0.1, 0.1, -0.5+0.6, 0.1},
+        wall_side = {-0.5, -0.3, -0.1, -0.5+0.3, 0.3, 0.1},
+    },
+    groups = {choppy=2,dig_immediate=3,flammable=1,attached_node=1},
+    legacy_wallmounted = true,
+    --sounds = default.node_sound_defaults(),
+})
+
 minetest.register_craft({
 	output = 'walking_light:pick_mese',
 	recipe = {
@@ -377,6 +561,15 @@ minetest.register_craft({
 	recipe = {
 		{'default:torch'},
 		{'3d_armor:helmet_diamond'},
+	}
+})
+
+minetest.register_craft({
+	output = 'walking_light:megatorch',
+	recipe = {
+		{'default:torch', 'default:torch', 'default:torch'},
+		{'default:torch', 'default:torch', 'default:torch'},
+		{'default:torch', 'default:torch', 'default:torch'},
 	}
 })
 
