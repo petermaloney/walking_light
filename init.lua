@@ -45,8 +45,11 @@ local function dumppostable(t)
 	if t == nil then
 		return "nil"
 	end
-	ret = "" .. #t
-	ret = ret .. "{\n"
+	if #t == 0 then
+		return "0{}"
+	end
+
+	ret = #t .. "{\n"
 	for i,pos in ipairs(t) do
 		ret = ret .. "    " .. dumppos(pos) .. "\n"
 	end
@@ -168,10 +171,11 @@ local function remove_light_player(player)
 
     for i,old_pos in ripairs(light_positions[player_name]) do
 		if old_pos then
---			print("DEBUG: walking_light globalstep, removing old light")
+--			print("DEBUG: walking_light.remove_light_player(), removing old light; old_pos = " .. dumppos(old_pos))
 			remove_light(player, old_pos)
 		end
 	end
+	print("DEBUG: walking_light.remove_light_player(), done; light_positions = " .. dumppostable(light_positions[player_name]))
 end
 
 local function can_add_light(pos)
@@ -239,13 +243,15 @@ end
 -- new function, returns table
 local function pick_light_position_radius(player, pos, ret, radius)
 	local pos2
-	local step = 1
+	local step = 4
+	local unstep = 1/step
 
 	for x = pos.x - radius, pos.x + radius, step do
 		for y = pos.y - radius, pos.y + radius, step do
 			for z = pos.z - radius, pos.z + radius, step do
-				pos2 = vector.new(x, y, z)
-				if can_add_light( pos2 ) then
+				pos2 = vector.new(round(x*unstep)*step, round(y*unstep)*step, round(z*unstep)*step)
+				distance = math.sqrt(math.pow(pos.x - x, 2) + math.pow(pos.y - y, 2) + math.pow(pos.z - z, 2))
+				if distance <= radius and can_add_light( pos2 ) then
 					table.insert(ret, pos2)
 				end
 			end
@@ -284,7 +290,9 @@ local function add_light(player, pos)
 	elseif node.name == "air" then
 		-- when the node that is already there is air, add light
 		mt_add_node(pos,{type="node",name="walking_light:light"})
-		table_insert_pos(light_positions[player_name], pos)
+		if not table_contains_pos(light_positions[player_name], pos) then
+			table_insert_pos(light_positions[player_name], pos)
+		end
 
 --		if node then
 --			print("DEBUG: add_light(), node.name = " .. node.name .. ", pos = " .. dumppos(pos))
@@ -296,10 +304,9 @@ local function add_light(player, pos)
 		-- no point in adding light where it is already, but we should assign it to the player so it gets removed (in case it has no player)
 --		print("DEBUG: add_light(), not adding; node.name = " .. node.name .. ", pos = " .. dumppos(pos))
 
-		-- old single position
---		light_positions[player_name] = pos
-		-- new table of positions
-		table_insert_pos(light_positions[player_name], pos)
+		if not table_contains_pos(light_positions[player_name], pos) then
+			table_insert_pos(light_positions[player_name], pos)
+		end
 
 		return true
 	end
@@ -337,6 +344,13 @@ local function update_light_player(player)
 --		print("DEBUG: walking_light update_light_player(); wantpos = " .. dumppos(wantpos) .. ", wantlightpos = " .. dumppos(wantlightpos))
 	end
 
+	if wielded_item and wantlightpos then
+		-- add light that isn't already there
+		for i,newpos in ipairs(wantlightpos) do
+			add_light(player, newpos)
+		end
+	end
+
 	-- go through all light owned by the player to remove all but what should be kept
     for i,oldlightpos in ripairs(light_positions[player_name]) do
         if not wantlightpos or oldlightpos and oldlightpos.x and not table_contains_pos(wantlightpos, oldlightpos) then
@@ -344,17 +358,9 @@ local function update_light_player(player)
         end
     end
 
-	if wielded_item then
-		-- add light that isn't already there
-		print("DEBUG: walking_light.update_light_player(): adding light table")
-		for i,newpos in ipairs(wantlightpos) do
-			add_light(player, newpos)
-		end
-	end
-
 	player_positions[player_name] = vector.round(pos)
 
---	print("DEBUG: walking_light.update_light_player(): wantlightpos = " .. dumppostable(wantlightpos) .. ", light_positions = " .. dumppostable(light_positions[player_name]))
+	print("DEBUG: walking_light.update_light_player(): wantlightpos = " .. dumppostable(wantlightpos) .. ", light_positions = " .. dumppostable(light_positions[player_name]))
 end
 
 local function update_light_all()
@@ -459,8 +465,8 @@ minetest.register_node("walking_light:clear", {
 
 minetest.register_node("walking_light:light", {
 	drawtype = "glasslike",
-	tile_images = {"walking_light.png"},
-	-- tile_images = {"walking_light_debug.png"},
+	-- tile_images = {"walking_light.png"},
+	tile_images = {"walking_light_debug.png"},
 	inventory_image = minetest.inventorycube("walking_light.png"),
 	paramtype = "light",
 	walkable = false,
