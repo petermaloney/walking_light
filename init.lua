@@ -435,11 +435,13 @@ minetest.register_on_leaveplayer(function(player)
 			local pos = player:getpos()
 			local rounded_pos = vector.round(pos)
 			remove_light_player(player)
-			player_positions[player_name]["x"] = nil
-			player_positions[player_name]["y"] = nil
-			player_positions[player_name]["z"] = nil
-			player_positions[player_name]["m"] = nil
-			player_positions[player_name] = nil
+			if player_positions[player_name] then
+				player_positions[player_name].x = nil
+				player_positions[player_name].y = nil
+				player_positions[player_name].z = nil
+				player_positions[player_name].m = nil
+				player_positions[player_name] = nil
+			end
 		end
 	end
 end)
