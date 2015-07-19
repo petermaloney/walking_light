@@ -316,6 +316,11 @@ end
 
 -- updates all the light around the player, depending on what they are wielding
 local function update_light_player(player)
+	-- if there is no player, there can be no update
+	if not player then
+		return
+	end
+
 	-- figure out if they wield light; this will be nil if not
 	local wielded_item = get_wielded_light_item(player)
 
