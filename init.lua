@@ -430,20 +430,11 @@ minetest.register_on_leaveplayer(function(player)
 	for i,v in ipairs(players) do
 		if v == player_name then 
 			table.remove(players, i)
-			last_wielded[player_name] = nil
-			-- Neuberechnung des Lichts erzwingen
-			local pos = player:getpos()
-			local rounded_pos = vector.round(pos)
-			remove_light_player(player)
-			if player_positions[player_name] then
-				player_positions[player_name].x = nil
-				player_positions[player_name].y = nil
-				player_positions[player_name].z = nil
-				player_positions[player_name].m = nil
-				player_positions[player_name] = nil
-			end
 		end
 	end
+	last_wielded[player_name] = false
+	remove_light_player(player)
+	player_positions[player_name]=nil
 end)
 
 minetest.register_globalstep(function(dtime)
