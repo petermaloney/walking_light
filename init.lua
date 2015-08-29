@@ -428,7 +428,7 @@ end)
 minetest.register_on_leaveplayer(function(player)
 	local player_name = player:get_player_name()
 	for i,v in ipairs(players) do
-		if v == player_name then 
+		if v == player_name then
 			table.remove(players, i)
 		end
 	end
