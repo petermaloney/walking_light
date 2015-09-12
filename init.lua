@@ -445,6 +445,7 @@ minetest.register_globalstep(function(dtime)
 			update_light_player(player)
 		else
 			table.remove(players, i)
+		end
 	end
 end)
 
