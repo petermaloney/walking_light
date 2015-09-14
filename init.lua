@@ -440,7 +440,6 @@ end)
 minetest.register_globalstep(function(dtime)
 	for i,player_name in ipairs(players) do
 		local player = minetest.env:get_player_by_name(player_name)
-		local wielded_item = ""
 		if player ~= nil then
 			update_light_player(player)
 		else
