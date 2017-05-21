@@ -478,13 +478,9 @@ minetest.register_node("walking_light:clear", {
 	drawtype = "glasslike",
 	tiles = {"walking_light.png"},
 	-- tiles = {"walking_light_debug.png"},
-	--inventory_image = minetest.inventorycube("walking_light.png"),
 	paramtype = "light",
 	walkable = false,
-	--is_ground_content = true,
-	--light_propagates = true,
 	sunlight_propagates = true,
-	--light_source = 13,
 	selection_box = {
 		type = "fixed",
 		fixed = {0, 0, 0, 0, 0, 0},
@@ -499,7 +495,6 @@ minetest.register_node("walking_light:light", {
 	paramtype = "light",
 	walkable = false,
 	is_ground_content = true,
-	--light_propagates = true,
 	sunlight_propagates = true,
 	light_source = 13,
 	selection_box = {
