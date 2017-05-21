@@ -645,3 +645,4 @@ minetest.register_chatcommand("mapaddlight", {
 	end,
 })
 
+-- vim: ts=4 sw=4 softtabstop=4 smarttab noexpandtab
