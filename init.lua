@@ -176,7 +176,6 @@ local function remove_light(player, pos)
 	end
 	local node = mt_get_node_or_nil(pos)
 	if node ~= nil and node.name == "walking_light:light" then
-		mt_add_node(pos,{type="node",name="walking_light:clear"})
 		mt_add_node(pos,{type="node",name="air"})
 		if player_name then
 			table_remove_pos(light_positions[player_name], pos)
@@ -473,19 +472,6 @@ minetest.register_globalstep(function(dtime)
 		end
 	end
 end)
-
-minetest.register_node("walking_light:clear", {
-	drawtype = "glasslike",
-	tiles = {"walking_light.png"},
-	-- tiles = {"walking_light_debug.png"},
-	paramtype = "light",
-	walkable = false,
-	sunlight_propagates = true,
-	selection_box = {
-		type = "fixed",
-		fixed = {0, 0, 0, 0, 0, 0},
-	},
-})
 
 minetest.register_node("walking_light:light", {
 	drawtype = "glasslike",
