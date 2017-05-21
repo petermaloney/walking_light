@@ -623,7 +623,7 @@ minetest.register_craft({
 	}
 })
 
-minetest.register_chatcommand("mapclearlight", {
+minetest.register_chatcommand("walking_light_clear_light", {
 	params = "<size>",
 	description = "Remove light nodes from the area",
 	func = function(name, param)
@@ -649,7 +649,7 @@ minetest.register_chatcommand("mapclearlight", {
 	end,
 })
 
-minetest.register_chatcommand("mapaddlight", {
+minetest.register_chatcommand("walking_light_add_light", {
 	params = "<size>",
 	description = "Add walking_light:light to a position, without a player owning it",
 	func = function(name, param)
