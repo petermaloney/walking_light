@@ -17,7 +17,7 @@ walking_light = {}
 
 -- list of items that use walking light
 local light_items = {
-	"default:torch", "walking_light:pick_mese",
+	"default:torch",
 	"walking_light:helmet_diamond", "walking_light:megatorch"
 }
 
@@ -542,20 +542,7 @@ function update_walking_light_node()
 end
 update_walking_light_node()
 
-minetest.register_tool("walking_light:pick_mese", {
-	description = "Mese Pickaxe with light",
-	inventory_image = "walking_light_mesepick.png",
-	wield_image = "default_tool_mesepick.png",
-	tool_capabilities = {
-		full_punch_interval = 1.0,
-		max_drop_level=3,
-		groupcaps={
-			cracky={times={[1]=2.0, [2]=1.0, [3]=0.5}, uses=20, maxlevel=3},
-			crumbly={times={[1]=2.0, [2]=1.0, [3]=0.5}, uses=20, maxlevel=3},
-			snappy={times={[1]=2.0, [2]=1.0, [3]=0.5}, uses=20, maxlevel=3}
-		}
-	},
-})
+walking_light.register_tool('pick')
 
 minetest.register_tool("walking_light:helmet_diamond", {
 	description = "Diamond Helmet with light",
@@ -614,14 +601,6 @@ minetest.register_node("walking_light:megatorch", {
     groups = {choppy=2,dig_immediate=3,flammable=1,attached_node=1},
     legacy_wallmounted = true,
     --sounds = default.node_sound_defaults(),
-})
-
-minetest.register_craft({
-	output = 'walking_light:pick_mese',
-	recipe = {
-		{'default:torch'},
-		{'default:pick_mese'},
-	}
 })
 
 minetest.register_craft({
