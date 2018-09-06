@@ -36,6 +36,25 @@ function walking_light.getLightItems()
 	return light_items
 end
 
+function walking_light.register_tool(tool)
+	item = 'walking_light:' .. tool .. '_mese'
+	default = 'default:' .. tool .. '_mese'
+
+	definition = table.copy(minetest.registered_items[default])
+	definition.description = definition.description .. ' with light'
+	definition.inventory_image = 'walking_light_mese' .. tool .. '.png'
+
+	minetest.register_tool(item, definition)
+	minetest.register_craft({
+		output = item,
+		recipe = {
+			{'default:torch'},
+			{ default },
+		}
+	})
+
+	walking_light.addLightItem(item)
+end
 
 -- from http://lua-users.org/wiki/IteratorsTutorial
 -- useful for removing things from a table because removing from the middle makes it skip elements otherwise
