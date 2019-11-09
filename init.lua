@@ -37,6 +37,7 @@ function walking_light.getLightItems()
 end
 
 function walking_light.register_tool(tool)
+	local item, default, definition
 	item = 'walking_light:' .. tool .. '_mese'
 	default = 'default:' .. tool .. '_mese'
 
